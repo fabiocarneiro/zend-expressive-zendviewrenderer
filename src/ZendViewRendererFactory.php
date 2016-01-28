@@ -69,8 +69,15 @@ class ZendViewRendererFactory
         $renderer = new PhpRenderer();
         $renderer->setResolver($resolver);
 
+        $manager = $container->has(HelperPluginManager::class)
+            ? $container->get(HelperPluginManager::class)
+            : new HelperPluginManager();
+
         // Inject helpers
-        $this->injectHelpers($renderer, $container);
+        $this->injectHelpers($renderer, $manager);
+        
+        // Initialize renderer for HelperPluginManager
+        $manager->setRenderer($renderer);
 
         // Inject renderer
         $view = new ZendViewRenderer($renderer, isset($config['layout']) ? $config['layout'] : null);
@@ -98,13 +105,9 @@ class ZendViewRendererFactory
      * @param PhpRenderer $renderer
      * @param ContainerInterface $container
      */
-    private function injectHelpers(PhpRenderer $renderer, ContainerInterface $container)
+    private function injectHelpers(PhpRenderer $renderer, HelperPluginManager $manager)
     {
-        $helpers = $container->has(HelperPluginManager::class)
-            ? $container->get(HelperPluginManager::class)
-            : new HelperPluginManager();
-
-        $helpers->setFactory('url', function () use ($container) {
+        $manager->setFactory('url', function () use ($container) {
             if (! $container->has(BaseUrlHelper::class)) {
                 throw new Exception\MissingHelperException(sprintf(
                     'An instance of %s is required in order to create the "url" view helper; not found',
@@ -113,7 +116,7 @@ class ZendViewRendererFactory
             }
             return new UrlHelper($container->get(BaseUrlHelper::class));
         });
-        $helpers->setFactory('serverurl', function () use ($container) {
+        $manager->setFactory('serverurl', function () use ($container) {
             if (! $container->has(BaseServerUrlHelper::class)) {
                 throw new Exception\MissingHelperException(sprintf(
                     'An instance of %s is required in order to create the "url" view helper; not found',
@@ -123,6 +126,6 @@ class ZendViewRendererFactory
             return new ServerUrlHelper($container->get(BaseServerUrlHelper::class));
         });
 
-        $renderer->setHelperPluginManager($helpers);
+        $renderer->setHelperPluginManager($manager);
     }
 }
